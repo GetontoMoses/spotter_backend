@@ -1,3 +1,5 @@
+"""Models for the trips app."""
+
 from django.db import models
 
 class Trip(models.Model):
