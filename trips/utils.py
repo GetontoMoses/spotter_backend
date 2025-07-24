@@ -1,7 +1,8 @@
 from geopy.geocoders import Nominatim
 import requests
 from django.conf import settings
-
+from config.settings.utils import get_env_variable
+from .models import DailyLog 
 
 def geocode_location(location):
     """
@@ -15,41 +16,41 @@ def geocode_location(location):
     return [location_data.longitude, location_data.latitude]
 
 
-def get_route_info(start, waypoint, end):
-    """
-    Uses the OpenRouteService (ORS) API to calculate:
-    - Total distance
-    - Duration
-    - Route polyline coordinates
-    """
+def get_route_info(start_coords, pickup_coords, dropoff_coords):
+    url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
 
-    url = "https://api.openrouteservice.org/v2/directions/driving-car"
-    headers = {"Authorization": settings.ORS_API_KEY}
+    coordinates = [start_coords, pickup_coords, dropoff_coords]
 
-    coords = [
-        geocode_location(start),
-        geocode_location(waypoint),
-        geocode_location(end),
-    ]
+    headers = {
+        "Authorization": get_env_variable("ORS_API_KEY"),
+        "Content-Type": "application/json",
+    }
 
-    data = {"coordinates": coords, "format": "geojson"}
+    response = requests.post(url, json={"coordinates": coordinates}, headers=headers)
 
-    response = requests.post(url, json=data, headers=headers)
-
-    if response.status_code == 200:
+    try:
         route = response.json()
-        segment = route["features"][0]["properties"]["segments"][0]
-        distance_km = segment["distance"] / 1000
-        duration_hr = segment["duration"] / 3600
-        geometry = route["features"][0]["geometry"]["coordinates"]
+    except ValueError:
+        raise ValueError("Invalid JSON response from ORS")
 
-        return {
-            "distance_km": round(distance_km, 2),
-            "duration_hr": round(duration_hr, 2),
-            "geometry": geometry,
-        }
+    # 🔍 Print the full response for debugging
+    print("ORS Response:", route)
 
-    return None
+    if response.status_code != 200:
+        raise ValueError(f"ORS API error: {route}")
+
+    if "features" not in route:
+        raise ValueError(f"Expected 'features' key not found. Response: {route}")
+
+    segment = route["features"][0]["properties"]["segments"][0]
+    distance = segment["distance"]  # in meters
+    duration = segment["duration"]  # in seconds
+
+    return {
+        "distance_km": round(distance / 1000, 2),
+        "duration_hours": round(duration / 3600, 2),
+        "geometry": route["features"][0]["geometry"],
+    }
 
 
 def plan_fuel_stops(distance_km):
@@ -72,6 +73,16 @@ def generate_eld_logs(total_drive_hours, cycle_hours_used):
         drive_today = min(11, total_drive_hours, remaining_cycle)
         on_duty = drive_today + 1  # Includes 1hr at pickup/dropoff
         off_duty = 24 - on_duty
+        
+        # Simulating 24-hour status log
+        for hour in range(24):
+            if hour < drive_today:
+                status = 'driving'
+            elif hour < on_duty:
+                status = 'on_duty'
+            else:
+                status = 'off_duty'
+            DailyLog.objects.create(trip=trip, day=day, hour=hour, status=status)
 
         logs.append(
             {
