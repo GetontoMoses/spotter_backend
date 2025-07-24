@@ -1,7 +1,7 @@
 """Serializers for the trips app."""
 
 from rest_framework import serializers
-from .models import Trip, LogEntry
+from .models import Trip, LocationUpdate, DailyLog
 
 
 class TripSerializer(serializers.ModelSerializer):
@@ -10,7 +10,13 @@ class TripSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class LogEntrySerializer(serializers.ModelSerializer):
+class LocationUpdateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = LogEntry
+        model = LocationUpdate
+        fields = "__all__"
+
+
+class DailyLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DailyLog
         fields = "__all__"
