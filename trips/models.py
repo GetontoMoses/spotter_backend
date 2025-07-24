@@ -4,30 +4,42 @@ from django.db import models
 
 
 class Trip(models.Model):
-    driver_name = models.CharField(max_length=100)
-    start_location = models.CharField(max_length=255)
-    destination = models.CharField(max_length=255)
-    start_time = models.DateTimeField()
-    is_completed = models.BooleanField(default=False)
+    current_location = models.CharField(max_length=100)
+    pickup_location = models.CharField(max_length=100)
+    dropoff_location = models.CharField(max_length=100)
+    cycle_hours_used = models.FloatField()
+    total_distance = models.FloatField(null=True, blank=True)
+    estimated_hours = models.FloatField(null=True, blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.driver_name}'s Trip from {self.start_location} to {self.destination}"
+        return f"Trip from {self.pickup_location} to {self.dropoff_location}"
 
 
-class LogEntry(models.Model):
-    STATUS_CHOICES = [
-        ("driving", "Driving"),
-        ("on_duty", "On Duty"),
-        ("off_duty", "Off Duty"),
-        ("sleeper birth", "sleeper birth"),
-     
-    ]
-
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="logs")
-    location = models.CharField(max_length=255)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
+class LocationUpdate(models.Model):
+    trip = models.ForeignKey(
+        Trip, on_delete=models.CASCADE, related_name="location_updates"
+    )
+    location = models.CharField(max_length=100)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("Off Duty", "Off Duty"),
+            ("Sleeper Birth", "Sleeper Birth"),
+            ("Driving", "Driving"),
+            ("On Duty", "On Duty"),
+        ],
+    )
 
     def __str__(self):
-        return f"{self.trip.driver_name}: {self.status} from {self.start_time} to {self.end_time}"
+        return f"{self.status} at {self.location} ({self.timestamp})"
+
+
+class DailyLog(models.Model):
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="daily_logs")
+    date = models.DateField()
+    log_image_url = models.URLField(
+        blank=True, null=True
+    )  
